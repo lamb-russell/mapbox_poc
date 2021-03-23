@@ -35,6 +35,7 @@ class TestMapboxGeocoding(unittest.TestCase):
         address = payload["features"][0]["properties"]["address"]
         self.assertEqual(address, '1600 Pennsylvania Ave NW')
 
+
     def test_clean_address(self):
         """
         check get clean address function using Point of interest
@@ -53,10 +54,11 @@ class TestMapboxGeocoding(unittest.TestCase):
         """
         mg=MapboxGeocoder(GEOCODING_ENDPOINT_TEMPORARY)
         response = mg.geocode("21 flushing ave 11205 new york")
+        #print(response.text)
         result=mg.parse_request(response)
         self.assertEqual(result["address"],"21 Flushing Avenue")
         self.assertEqual(result["locality"],"Brooklyn")
         self.assertEqual(result["postcode"], "11205")
         self.assertEqual(result["region"], "New York")
-
+        print(result)
         #print(features[0]["properties"])

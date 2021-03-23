@@ -72,7 +72,8 @@ class MapboxGeocoder():
         result["postcode"] = next(iter([y["text"] for y in context if y["id"].startswith("postcode")]),None)  # zipcode
         result["region"] = next(iter([y["text"] for y in context if y["id"].startswith("region")]),None)  # state
         result["locality"] = next(iter([y["text"] for y in context if y["id"].startswith("locality")]), None)  # state
-
+        result["country"] = next(iter([y["text"] for y in context if y["id"].startswith("country")]), None)
+        result["country_code"] = next(iter([y["short_code"] for y in context if y["id"].startswith("country")]), None)
         result["address"] = (result["address_property"] if result["place_type"]=="poi" # poi address has # and street
                              else f'{result["street_number"]} {result["address_feature"]}') # append number to street
 

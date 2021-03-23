@@ -9,9 +9,12 @@ ENV_VAR="MAPBOX_API_TOKEN"
 GEOCODING_ENDPOINT_TEMPORARY = "geocoding/v5/mapbox.places"
 GEOCODING_ENDPOINT_PERMANENT = "geocoding/v5/mapbox.places-permanent"
 
+
 class MapboxGeocoder():
     """
     encapsulates api calling for MapBox geocoder api
+
+    use get_clean_address to parse an address into its component parts.
     """
 
     def __init__(self, endpoint=None):
@@ -43,20 +46,43 @@ class MapboxGeocoder():
         :param query: unparsed address
         :return: dictionary of clean address components
         """
-        response = call_mapbox_endpoint(query, self.token, self.endpoint)
-        payload = json.loads(response.text)  # convert json to dictionary
+        result = call_mapbox_endpoint(query, self.token, self.endpoint)
+        clean_address = self.parse_request(result)
+        return clean_address
+
+    def parse_request(self, response_object, verbose=False):
+        """
+        parse address from response object
+        :param response_object: http get response
+        :param verbose: if true, include intermediate values in dictionary returned
+        :return: dictionary with relevant values from response object
+        """
+        payload = json.loads(response_object.text)  # convert json to dictionary
         features = payload["features"]  # get list of results
         first = (features[0])  # get first result
         properties = first["properties"]  # get properties of result (where address is)
-        address = properties["address"]  # street address
-        context = first["context"]  # get context (where zipcode and state are)
-        postcode = [y for y in context if y["id"].startswith("postcode")][0]["text"] #zipcode
-        region = [y for y in context if y["id"].startswith("region")][0]["text"] #state
-        clean_address = dict()  # create dictionary for results
-        clean_address["address"]=address
-        clean_address["postcode"]=postcode
-        clean_address["region"]=region
-        return clean_address
+
+        result = dict()  # create dictionary for results
+        result["address_property"] = properties.get("address")  # poi has street address in properties
+        context = first["context"]  # context has more details about request in list form.  parse by id prefix
+        # i use next() and iter() functions to get the first item in the list that matches the condition specified
+        result["place_type"] = next(iter(first["place_type"]),None)  # place type from first feature
+        result["address_feature"] = first.get("text") # street name
+        result["street_number"] = first.get("address")  # street number
+        result["postcode"] = next(iter([y["text"] for y in context if y["id"].startswith("postcode")]),None)  # zipcode
+        result["region"] = next(iter([y["text"] for y in context if y["id"].startswith("region")]),None)  # state
+        result["locality"] = next(iter([y["text"] for y in context if y["id"].startswith("locality")]), None)  # state
+
+        result["address"] = (result["address_property"] if result["place_type"]=="poi" # poi address has # and street
+                             else f'{result["street_number"]} {result["address_feature"]}') # append number to street
+
+        keys = [k for k in result] # need to store  keys separtely so we can modify dictionary
+        if not verbose: # if not verbose, remove empty values from the dictionary
+            for i in keys:
+                if not result[i]: # remove keys from dictionary if value is None
+                    result.pop(i)
+        return result
+
 
 def build_url(query, endpoint):
     """

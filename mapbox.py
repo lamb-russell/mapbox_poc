@@ -4,6 +4,7 @@ call mapbox api
 import requests
 import os
 import json
+import csv
 
 ENV_VAR="MAPBOX_API_TOKEN"
 GEOCODING_ENDPOINT_TEMPORARY = "geocoding/v5/mapbox.places"
@@ -50,7 +51,7 @@ class MapboxGeocoder():
         clean_address = self.parse_request(result)
         return clean_address
 
-    def parse_request(self, response_object, verbose=False):
+    def parse_request(self, response_object, verbose=True):
         """
         parse address from response object
         :param response_object: http get response
@@ -71,6 +72,10 @@ class MapboxGeocoder():
         result["street_number"] = first.get("address")  # street number
         result["postcode"] = next(iter([y["text"] for y in context if y["id"].startswith("postcode")]),None)  # zipcode
         result["region"] = next(iter([y["text"] for y in context if y["id"].startswith("region")]),None)  # state
+        result["region_code"] = next(iter([y["short_code"] for y in context if y["id"].startswith("region")]), None)  # state code
+
+        result["place"] = next(iter([y["text"] for y in context if y["id"].startswith("place")]), None)  # city
+
         result["locality"] = next(iter([y["text"] for y in context if y["id"].startswith("locality")]), None)  # state
         result["country"] = next(iter([y["text"] for y in context if y["id"].startswith("country")]), None)
         result["country_code"] = next(iter([y["short_code"] for y in context if y["id"].startswith("country")]), None)
@@ -122,7 +127,68 @@ def get_token():
         return None
     return api_key
 
+
+def read_addresses_from_csv(file_path):
+    """
+    Read addresses from a CSV file.
+    :param file_path: Path to the CSV file
+    :return: List of addresses
+    """
+    # Expand the user's home directory symbol (~)
+    expanded_path = os.path.expanduser(file_path)
+
+    addresses = []
+    with open(expanded_path, mode='r', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        next(reader, None)  # Skip the header row if there is one
+        for row in reader:
+            addresses.append(row[0])  # Assuming address is in the first column
+    return addresses
+
+def save_results_to_csv(results, output_file):
+    """
+    Save the processed address data to a CSV file.
+    :param results: List of dictionaries containing address data
+    :param output_file: Path to the output CSV file
+    """
+    # Expand the user's home directory symbol (~)
+    expanded_path = os.path.expanduser(output_file)
+
+    with open(expanded_path, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=results[0].keys())
+        writer.writeheader()
+        for result in results:
+            try:
+                writer.writerow(result)
+            except Exception as ex:
+                print(f"error writing result: {result}")
+                print(ex)
+
+
 if __name__=="__main__":
-    token = get_token()
-    response = call_mapbox_endpoint("the white house",token, GEOCODING_ENDPOINT_TEMPORARY)
-    print(response.text)
+    #token = get_token()
+    #response = call_mapbox_endpoint("the white house",token, GEOCODING_ENDPOINT_TEMPORARY)
+
+    #print(response.text)
+
+    #mbg=MapboxGeocoder()
+    #parsed_address=mbg.get_clean_address("the white house")
+    #print(parsed_address)
+
+    input_csv = "~/Downloads/sweater_addresses.csv"  # Replace with your CSV file path
+    output_csv = "~/Downloads/sweater_addresses_output.csv"  # Replace with your desired output file path
+
+    addresses = read_addresses_from_csv(input_csv)
+
+    geocoder = MapboxGeocoder()
+    processed_addresses = []
+
+    for address in addresses:
+        try:
+            clean_address = geocoder.get_clean_address(address)
+            processed_addresses.append(clean_address)
+            print(f"{address} - {clean_address}")
+        except Exception as e:
+            print(f"Error processing address '{address}': {e}")
+
+    save_results_to_csv(processed_addresses, output_csv)
